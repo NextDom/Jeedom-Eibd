@@ -1,59 +1,59 @@
 <?php
 class knxproj {
 	private $path;
-	private $ProjetType;
-	private $Devices=array();
-	private $GroupAddresses=array();
-	private $Locations=array();
-	private $Templates=array();
+	private $projectType;
+	private $devices=array();
+	private $groupAddresses=array();
+	private $locations=array();
+	private $templates=array();
 	private $myProject=array();
-	public static function ExtractTX100ProjectFile($File){
+	public static function extractTX100ProjectFile($file){
 		$path = dirname(__FILE__) . '/../config/knxproj/';
 		if (!is_dir($path)) 
 			mkdir($path);
-		exec('sudo chmod -R 777 '.$path);
-		system('cd ' . $path . '; tar xfz "' . $File . '"');
+		exec('sudo chmod -R 655 '.$path);
+		system('cd ' . $path . '; tar xfz "' . $file . '"');
 		log::add('eibd','debug','[Import TX100] Extraction des fichiers de projets');
 	}
-	public static function ExtractETSProjectFile($File){
+	public static function extractETSProjectFile($file){
 		$path = dirname(__FILE__) . '/../config/knxproj/';
 		if (!is_dir($path)) 
 			mkdir($path);
-		exec('sudo chmod -R 777 '.$path);
+		exec('sudo chmod -R 655 '.$path);
 		$zip = new ZipArchive(); 
 		// On ouvre l’archive.
-		if($zip->open($File) == TRUE){
+		if($zip->open($file) == TRUE){
 			$zip->extractTo($path);
 			$zip->close();
 		}
 		log::add('eibd','debug','[Import ETS] Extraction des fichiers de projets');
 	}
- 	public function __construct($_Merge,$_ProjetType){
+ 	public function __construct($_merge, $_projectType){
 		$this->path = dirname(__FILE__) . '/../config/knxproj/';
-		$this->Templates=eibd::devicesParameters();
-		$this->ProjetType=$_ProjetType;
-		if($_Merge != 'false'){
+		$this->templates=eibd::devicesParameters();
+		$this->projectType=$_projectType;
+		if($_merge != 'false'){
 			log::add('eibd','debug','[Import ETS] Chargement du fichier projet');
 			$filename=dirname(__FILE__) . '/../config/KnxProj.json';
 			$myKNX=json_decode(file_get_contents($filename),true);
-			$this->Devices=$myKNX['DevicesAll'];
-			$this->GroupAddresses=$myKNX['GAD'];
-			$this->Locations=$myKNX['Locations'];
+			$this->devices=$myKNX['DevicesAll'];
+			$this->groupAddresses=$myKNX['GAD'];
+			$this->locations=$myKNX['Locations'];
 		}
 		//log::add('eibd','debug','[Import ETS]'.json_encode($_options));
-		switch($this->ProjetType){
+		switch($this->projectType){
 			case "ETS":
-				$ProjetFile=$this->SearchETSFolder("P-");
-				$this->myProject=simplexml_load_file($ProjetFile.'/0.xml');
-				$this->ParserETSDevice();
-				$this->ParserETSGroupAddresses();
-				$this->ParserLocations();
+				$projectFile=$this->searchETSFolder("P-");
+				$this->myProject=simplexml_load_file($projectFile.'/0.xml');
+				$this->parserETSDevice();
+				$this->parserETSGroupAddresses();
+				$this->parserLocations();
 				//$this->CheckOptions();
 			break;
 			case "TX100":
-				$ProjetFile=$this->SearchTX100Folder($this->path);
-				$this->ParserTX100GroupAddresses();
-				$this->ParserTX100Products();				
+				$this->searchTX100Folder($this->path);
+				$this->parserTX100GroupAddresses();
+				$this->parserTX100Products();
 			break;
 		}
 	}
@@ -62,7 +62,7 @@ class knxproj {
 		if (file_exists($path)) 
 			exec('sudo rm -R '.$path );
 	}
-	public function WriteJsonProj(){
+	public function writeJsonProj(){
 		$filename=dirname(__FILE__) . '/../config/KnxProj.json';
 		if (file_exists($filename)) 
 			exec('sudo rm '.$filename);
@@ -71,20 +71,20 @@ class knxproj {
 		fclose($file);	
 	}
 	public function getAll(){
-		foreach($this->Devices as $DeviceProductRefId => $Device){
-			$myKNX['Devices']['('.$Device['AdressePhysique'].') '.$Device['DeviceName']] = null;
-			foreach($Device['Cmd'] as $GroupAddressRefId=> $Cmd){
-				$myKNX['Devices']['('.$Device['AdressePhysique'].') '.$Device['DeviceName']][$Cmd['cmdName']]['AdressePhysique']=$Device['AdressePhysique'];
-				$myKNX['Devices']['('.$Device['AdressePhysique'].') '.$Device['DeviceName']][$Cmd['cmdName']]['AdresseGroupe']=$Cmd['AdresseGroupe'];
-				$myKNX['Devices']['('.$Device['AdressePhysique'].') '.$Device['DeviceName']][$Cmd['cmdName']]['DataPointType']=$Cmd['DataPointType'];
+		foreach($this->devices as $deviceProductRefId => $device){
+			$myKNX['Devices']['('.$device['AdressePhysique'].') '.$device['DeviceName']] = null;
+			foreach($device['Cmd'] as $groupAddressRefId=> $cmd){
+				$myKNX['Devices']['('.$device['AdressePhysique'].') '.$device['DeviceName']][$cmd['cmdName']]['AdressePhysique']=$device['AdressePhysique'];
+				$myKNX['Devices']['('.$device['AdressePhysique'].') '.$device['DeviceName']][$cmd['cmdName']]['AdresseGroupe']=$cmd['AdresseGroupe'];
+				$myKNX['Devices']['('.$device['AdressePhysique'].') '.$device['DeviceName']][$cmd['cmdName']]['DataPointType']=$cmd['DataPointType'];
 			}
 		}
-		$myKNX['DevicesAll']=$this->Devices;
-		$myKNX['GAD']=$this->GroupAddresses;
-		$myKNX['Locations']=$this->Locations;
+		$myKNX['DevicesAll']=$this->devices;
+		$myKNX['GAD']=$this->groupAddresses;
+		$myKNX['Locations']=$this->locations;
 		return json_encode($myKNX,JSON_PRETTY_PRINT);
 	}
-	private function SearchTX100Folder($path){
+	private function searchTX100Folder($path){
 		if ($dh = opendir($path)){
 			log::add('eibd','debug','[Import TX100] overture de  '.$path);
 			while (($file = readdir($dh)) !== false){
@@ -95,7 +95,7 @@ class knxproj {
 						log::add('eibd','debug','[Import TX100] Dossier courant '.$this->path);
 						return $this->path;
 					}else{
-						$this->SearchTX100Folder($path.$file.'/');
+						$this->searchTX100Folder($path.$file.'/');
 					}
 				}
 			}
@@ -103,10 +103,10 @@ class knxproj {
 		}	
 		return false;
 	}
-	private function SearchETSFolder($Folder){
+	private function searchETSFolder($folder){
 		if ($dh = opendir($this->path)){
 			while (($file = readdir($dh)) !== false){
-				if (substr($file,0,2) == $Folder){
+				if (substr($file,0,2) == $folder){
 					if (opendir($this->path . $file)) 
 						return $this->path . $file;
 				}
@@ -115,13 +115,13 @@ class knxproj {
 		}	
 		return false;
 	}
-	private function getETSCatalogue($DeviceProductRefId){	
+	private function getETSCatalog($deviceProductRefId){
 		//log::add('eibd','debug','[Import ETS] Rechecher des nom de module dans le catalogue');
-		$Catalogue = new DomDocument();
-		if ($Catalogue->load($this->path . substr($DeviceProductRefId,0,6).'/Catalog.xml')) {//XMl décrivant les équipements
-			foreach($Catalogue->getElementsByTagName('CatalogItem') as $CatalogItem){
-				if ($DeviceProductRefId==$CatalogItem->getAttribute('ProductRefId'))
-					return $CatalogItem->getAttribute('Name');
+		$catalog = new DomDocument();
+		if ($catalog->load($this->path . substr($deviceProductRefId,0,6).'/Catalog.xml')) {//XMl décrivant les équipements
+			foreach($catalog->getElementsByTagName('CatalogItem') as $catalogItem){
+				if ($deviceProductRefId==$catalogItem->getAttribute('ProductRefId'))
+					return $catalogItem->getAttribute('Name');
 			}
 		}
 	}
@@ -130,111 +130,111 @@ class knxproj {
 			return (string) $object[$attribute];
 		return false;
 	}
-	private function getTX100Topology($id){
-		$Topology=simplexml_load_file($this->path . 'Topology.xml');
-		foreach ($Topology->children() as $Room) {
-			$RoomId = $this->xml_attribute($Room, 'name');	
-			foreach ($Room->children() as $Property) {
-				$PropertyKey = $this->xml_attribute($Property, 'key');
-				$PropertyValue = $this->xml_attribute($Property, 'value');
-				if($PropertyKey == "name")
-					return $PropertyValue;
+	private function getTX100Topology(){
+		$topology=simplexml_load_file($this->path . 'Topology.xml');
+		foreach ($topology->children() as $room) {
+			$this->xml_attribute($room, 'name');
+			foreach ($room->children() as $property) {
+				$propertyKey = $this->xml_attribute($property, 'key');
+				$propertyValue = $this->xml_attribute($property, 'value');
+				if($propertyKey == "name")
+					return $propertyValue;
 			}
 		}
 		return '';
 	}
-	private function ParserTX100Products(){
+	private function parserTX100Products(){
 		log::add('eibd','debug','[Import TX100] Recherche des equipement');
-		$Products=simplexml_load_file($this->path . 'Products.xml');		
-		foreach ($Products->children() as $Product) {
-			$ProductId = $this->xml_attribute($Product, 'name');	
-			foreach ($Product->children() as $Property) {
-				$PropertyKey = $this->xml_attribute($Property, 'key');
-				$PropertyValue = $this->xml_attribute($Property, 'value');
-				if($PropertyKey == "SerialNumber")
-					$SerialNumber = $PropertyValue;
-				if($PropertyKey == "ProductCatalogReference")
-					$Reference = $PropertyValue;
-				if($PropertyKey == "IndividualAddress")
-					$IndividualAddress = $PropertyValue;
-				if($PropertyKey == "product.location")
-					$Location = $this->getTX100Topology($PropertyValue);
+		$products=simplexml_load_file($this->path . 'Products.xml');
+		foreach ($products->children() as $product) {
+			$productId = $this->xml_attribute($product, 'name');
+			foreach ($product->children() as $property) {
+				$propertyKey = $this->xml_attribute($property, 'key');
+				$propertyValue = $this->xml_attribute($property, 'value');
+				if($propertyKey == "SerialNumber")
+					$serialNumber = $propertyValue;
+				if($propertyKey == "ProductCatalogReference")
+					$reference = $propertyValue;
+				if($propertyKey == "IndividualAddress")
+					$individualAddress = $propertyValue;
+				if($propertyKey == "product.location")
+					$location = $this->getTX100Topology();
 			}
-			$this->Devices[$ProductId]['AdressePhysique'] = $IndividualAddress;
-			$this->Devices[$ProductId]['DeviceName'] = $Location.' - '.$Reference.' ('.$SerialNumber.')';
-			$this->Devices[$ProductId]['Cmd'] = $this->getTX100ProductCmd($ProductId);
-			//$this->Devices[$ProductId]['Cmd']['']['DataPointType']='';
-			//$this->Devices[$ProductId]['Cmd']['']['cmdName']='';
-			//$this->Devices[$ProductId]['Cmd']['']['AdresseGroupe']='';
-									
+			if(isset($individualAddress)){
+				$this->devices[$productId]['AdressePhysique'] = $individualAddress;
+			}
+			if(isset($location) && isset($reference) && isset($serialNumber)) {
+				$this->devices[$productId]['DeviceName'] = $location . ' - ' . $reference . ' (' . $serialNumber . ')';
+			}
+			$this->devices[$productId]['Cmd'] = $this->getTX100ProductCmd($productId);
 		}
 	}
-	private function ParserTX100GroupAddresses(){
+	private function parserTX100GroupAddresses(){
 		log::add('eibd','debug','[Import TX100] Création de l\'arborescence d\'adresse de groupe');
-		$GroupLinks=simplexml_load_file($this->path . 'GroupLinks.xml');
-		$this->GroupAddresses = $this->getTX100Level($GroupLinks);
+		$groupLinks=simplexml_load_file($this->path . 'GroupLinks.xml');
+		$this->groupAddresses = $this->getTX100Level($groupLinks);
 	}
-	private function getTX100Level($GroupRanges,$NbLevel=0){
-		$Level = array();
-		$NbLevel++;
-		foreach ($GroupRanges->children() as $GroupRange) {
-			$GroupName = $this->xml_attribute($GroupRange, 'name');
-          		if ($GroupName == 'Links'){
-		  		$NbLevel--;
-				return $this->getTX100Level($GroupRange,$NbLevel);
+	private function getTX100Level($groupRanges, $nbLevel=0){
+		$level = array();
+		$nbLevel++;
+		foreach ($groupRanges->children() as $groupRange) {
+			$groupName = $this->xml_attribute($groupRange, 'name');
+          		if ($groupName == 'Links'){
+		  		$nbLevel--;
+				return $this->getTX100Level($groupRange,$nbLevel);
 			}
-			if($GroupRange->getName() == 'property' && $this->xml_attribute($GroupRange, 'key') == "GroupAddress"){
-				config::save('level',$NbLevel,'eibd');
-				$AdresseGroupe=$this->formatgaddr($this->xml_attribute($GroupRange, 'value'));
-				$ChannelId=$this->xml_attribute($GroupRanges->config->property, 'key');
-				$DataPointId=$this->xml_attribute($GroupRanges->config->property, 'value');
-				list($DataPointType,$GroupName)=$this->getTX100DptInfo($ChannelId,$DataPointId);
-				$Level[$GroupName]=array('DataPointType' => $DataPointType,'AdresseGroupe' => $AdresseGroupe);
-				return $Level;
+			if($groupRange->getName() == 'property' && $this->xml_attribute($groupRange, 'key') == "GroupAddress"){
+				config::save('level',$nbLevel,'eibd');
+				$addressGroup=$this->formatgaddr($this->xml_attribute($groupRange, 'value'));
+				$channelId=$this->xml_attribute($groupRanges->config->property, 'key');
+				$dataPointId=$this->xml_attribute($groupRanges->config->property, 'value');
+				list($dataPointType,$groupName)=$this->getTX100DptInfo($channelId,$dataPointId);
+				$level[$groupName]=array('DataPointType' => $dataPointType,'AdresseGroupe' => $addressGroup);
+				return $level;
 			}else{
-				if($GroupRange->getName() == 'config')
-					$Level[$GroupName]=$this->getTX100Level($GroupRange,$NbLevel);
+				if($groupRange->getName() == 'config')
+					$level[$groupName]=$this->getTX100Level($groupRange,$nbLevel);
 			}
         	}
-		return $Level;
+		return $level;
 	}
-	private function getTX100ProductCmd($ProductId){
-		$DataPointType='';	
-		$GroupName=' - ';
-		$Channels=simplexml_load_file($this->path . 'Channels.xml');
-		foreach ($Channels->children() as $Channel) {
-			$ChannelId = $this->xml_attribute($Channel, 'name');
-			foreach ($Channel->children() as $Block) {
-				if($this->xml_attribute($Block, 'name') == "Context"){
-					foreach ($Block->children() as $parameter) {
+	private function getTX100ProductCmd($productId){
+		$dataPointType='';
+		$groupName=' - ';
+		$channels=simplexml_load_file($this->path . 'Channels.xml');
+		foreach ($channels->children() as $channel) {
+			$channelId = $this->xml_attribute($channel, 'name');
+			foreach ($channel->children() as $block) {
+				if($this->xml_attribute($block, 'name') == "Context"){
+					foreach ($block->children() as $parameter) {
 						if($this->xml_attribute($parameter, 'key') == 'product.id'){
-							if($this->xml_attribute($parameter, 'value') == $ProductId){
+							if($this->xml_attribute($parameter, 'value') == $productId){
 							}
 						}
 					}
 				}
 			}
 		}
-		return array($DataPointType,$GroupName);
+		return array($dataPointType,$groupName);
 	}
-	private function getTX100DptInfo($ChannelId,$DataPointId){
-		$DataPointType='';	
-		$GroupName=' - ';
-		$Channels=simplexml_load_file($this->path . 'Channels.xml');
-		foreach ($Channels->children() as $Channel) {
-			if($this->xml_attribute($Channel, 'name') == $ChannelId){
-				foreach ($Channel->children() as $Block) {
-					if($this->xml_attribute($Block, 'name') == "FunctionalBlocks"){
-						foreach ($Block->children() as $FunctionalBlock) {
-							foreach ($FunctionalBlock->config->children() as $datapoints) {								
-								if($this->xml_attribute($datapoints, 'name') == $DataPointId){	
-									foreach ($datapoints->children() as $parameter) {
+	private function getTX100DptInfo($channelId, $dataPointId){
+		$dataPointType='';
+		$groupName=' - ';
+		$channels=simplexml_load_file($this->path . 'Channels.xml');
+		foreach ($channels->children() as $channel) {
+			if($this->xml_attribute($channel, 'name') == $channelId){
+				foreach ($channel->children() as $block) {
+					if($this->xml_attribute($block, 'name') == "FunctionalBlocks"){
+						foreach ($block->children() as $functionalBlock) {
+							foreach ($functionalBlock->config->children() as $dataPoints) {
+								if($this->xml_attribute($dataPoints, 'name') == $dataPointId){
+									foreach ($dataPoints->children() as $parameter) {
 										if($this->xml_attribute($parameter, 'key') == 'aDPTNumber')
-											$DataPointType=$this->xml_attribute($parameter, 'value').".xxx";
+											$dataPointType=$this->xml_attribute($parameter, 'value').".xxx";
 										if($this->xml_attribute($parameter, 'key') == 'name')
-											$GroupName=$this->xml_attribute($parameter, 'value');
+											$groupName=$this->xml_attribute($parameter, 'value');
 									}
-									return array($DataPointType,$GroupName);
+									return array($dataPointType,$groupName);
 								}
 							}
 						}
@@ -242,104 +242,106 @@ class knxproj {
 				}
 			}
 		}
-		return array($DataPointType,$GroupName);
+		return array($dataPointType,$groupName);
 	}
-	private function ParserLocations(){
+	private function parserLocations(){
 		log::add('eibd','debug','[Import ETS] Création de l\'arborescence de localisation');
 		$Level = $this->myProject->Project->Installations->Installation->Locations;
-		$this->Locations = $this->getETSLevel($Level,$this->Locations);
-		if(!$this->Locations){
+		$this->locations = $this->getETSLevel($Level,$this->locations);
+		if(!$this->locations){
 			$Level = $this->myProject->Project->Installations->Installation->Buildings;
-			$this->Locations = $this->getETSLevel($Level,$this->Locations);
+			$this->locations = $this->getETSLevel($Level,$this->locations);
 
 		}
 	}
-	private function ParserETSGroupAddresses(){
+	private function parserETSGroupAddresses(){
 		log::add('eibd','debug','[Import ETS] Création de l\'arborescence d\'adresse de groupe');
 		$Level= $this->myProject->Project->Installations->Installation->GroupAddresses->GroupRanges;
-		$this->GroupAddresses = $this->getETSLevel($Level,$this->GroupAddresses);
+		$this->groupAddresses = $this->getETSLevel($Level,$this->groupAddresses);
 	}
-	private function getETSLevel($GroupRanges,$Level=null,$NbLevel=0){
-    		if($Level == null)
-			$Level = array();
-		$NbLevel++;
-		if($GroupRanges == null)
+	private function getETSLevel($groupRanges, $level=null, $nbLevel=0){
+    		if($level == null)
+			$level = array();
+		$nbLevel++;
+		if($groupRanges == null)
 			return false;
-		foreach ($GroupRanges->children() as $GroupRange) {
-			$GroupName = $this->xml_attribute($GroupRange, 'Name');
-			if($GroupRange->getName() == 'GroupAddress'){
-				config::save('level',$NbLevel,'eibd');
-				$AdresseGroupe=$this->formatgaddr($this->xml_attribute($GroupRange, 'Address'));
-				$GroupId=$this->xml_attribute($GroupRange, 'Id');
-				list($AdressePhysique,$DataPointType)=$this->updateDeviceInfo($GroupId,$GroupName,$AdresseGroupe);				
-				$Level['('.$AdresseGroupe.') '.$GroupName]=array('AdressePhysique' => $AdressePhysique ,'DataPointType' => $DataPointType,'AdresseGroupe' => $AdresseGroupe);
-			}elseif($GroupRange->getName() == 'DeviceInstanceRef'){	
-				$Level = $this->getDeviceGad($Level,$this->xml_attribute($GroupRange, 'RefId'));    
-			}else{
-				if(count($Level[$GroupName]) == 0)
-					$Level[$GroupName]=$this->getETSLevel($GroupRange,null,$NbLevel);
-			}
-		}
-		return $Level;
-	}
-	private function getDeviceGad($DeviceGad,$id){	
-		if($DeviceGad == null)
-			$DeviceGad =array();
-		foreach($this->Devices as $DeviceProductRefId => $Device){
-			if(strrpos($id,$DeviceProductRefId) !== false){
-				foreach($Device['Cmd'] as $GroupAddressRefId=> $Cmd){
-					$DeviceGad[$Cmd['cmdName'].' ('.$Device['AdressePhysique'].')']['AdressePhysique']=$Device['AdressePhysique'];
-					$DeviceGad[$Cmd['cmdName'].' ('.$Device['AdressePhysique'].')']['AdresseGroupe']=$Cmd['AdresseGroupe'];
-					$DeviceGad[$Cmd['cmdName'].' ('.$Device['AdressePhysique'].')']['DataPointType']=$Cmd['DataPointType'];
+		foreach ($groupRanges->children() as $groupRange) {
+			$groupName = $this->xml_attribute($groupRange, 'Name');
+			if($groupRange->getName() == 'GroupAddress'){
+				config::save('level',$nbLevel,'eibd');
+				$addressGroup=$this->formatgaddr($this->xml_attribute($groupRange, 'Address'));
+				$groupId=$this->xml_attribute($groupRange, 'Id');
+				list($addressPhysical,$dataPointType)=$this->updateDeviceInfo($groupId,$groupName,$addressGroup);
+				$level['('.$addressGroup.') '.$groupName]=array('AdressePhysique' => $addressPhysical ,'DataPointType' => $dataPointType,'AdresseGroupe' => $addressGroup);
+			}elseif($groupRange->getName() == 'DeviceInstanceRef'){
+				$level = $this->getDeviceGad($level,$this->xml_attribute($groupRange, 'RefId'));
+			}else {
+				if (count($level[$groupName]) == 0) {
+					$level[$groupName] = $this->getETSLevel($groupRange, null, $nbLevel);
 				}
-             			break;
 			}
 		}
-		return $DeviceGad;
+		return $level;
+	}
+	private function getDeviceGad($deviceGad, $id){
+		if($deviceGad == null)
+			$deviceGad =array();
+		foreach($this->devices as $deviceProductRefId => $device){
+			if(strrpos($id,$deviceProductRefId) !== false){
+				foreach($device['Cmd'] as $groupAddressRefId=> $cmd){
+					$deviceGad[$cmd['cmdName'].' ('.$device['AdressePhysique'].')']['AdressePhysique']=$device['AdressePhysique'];
+					$deviceGad[$cmd['cmdName'].' ('.$device['AdressePhysique'].')']['AdresseGroupe']=$cmd['AdresseGroupe'];
+					$deviceGad[$cmd['cmdName'].' ('.$device['AdressePhysique'].')']['DataPointType']=$cmd['DataPointType'];
+				}
+             	break;
+			}
+		}
+		return $deviceGad;
 	}
 	private function updateDeviceInfo($id,$name,$addr){
-		$AdressePhysique='';
-		$DataPointType='';
-		foreach($this->Devices as $DeviceProductRefId => $Device){
-			foreach($Device['Cmd'] as $GroupAddressRefId=> $Cmd){
-				if(strrpos($id,$GroupAddressRefId) !== false){
-					$AdressePhysique = $this->Devices[$DeviceProductRefId]['AdressePhysique'];
-					$this->Devices[$DeviceProductRefId]['Cmd'][$GroupAddressRefId]['cmdName']=$name;
-					$this->Devices[$DeviceProductRefId]['Cmd'][$GroupAddressRefId]['AdresseGroupe']=$addr;
-					if($DataPointType == '')
-						$DataPointType = $this->Devices[$DeviceProductRefId]['Cmd'][$GroupAddressRefId]['DataPointType'];
+		$addressPhysical='';
+		$dataPointType='';
+		foreach($this->devices as $deviceProductRefId => $device){
+			foreach($device['Cmd'] as $groupAddressRefId=> $cmd){
+				if(strrpos($id,$groupAddressRefId) !== false){
+					$addressPhysical = $this->devices[$deviceProductRefId]['AdressePhysique'];
+					$this->devices[$deviceProductRefId]['Cmd'][$groupAddressRefId]['cmdName']=$name;
+					$this->devices[$deviceProductRefId]['Cmd'][$groupAddressRefId]['AdresseGroupe']=$addr;
+					if($dataPointType == '') {
+						$dataPointType = $this->devices[$deviceProductRefId]['Cmd'][$groupAddressRefId]['DataPointType'];
+					}
 				}
 			}
 		}
-		return array($AdressePhysique,$DataPointType);
+		return array($addressPhysical,$dataPointType);
 	}
-	private function ParserETSDevice(){
+	private function parserETSDevice(){
 		log::add('eibd','debug','[Import ETS] Recherche de device');
-		$Topology = $this->myProject->Project->Installations->Installation->Topology;
-		if($Topology == null)
+		$topology = $this->myProject->Project->Installations->Installation->Topology;
+		if($topology == null)
 			return false;
-		foreach($Topology->children() as $Area){
-			$AreaAddress=$this->xml_attribute($Area, 'Address');
-			foreach ($Area->children() as $Line)  {
-				$LineAddress=$this->xml_attribute($Line, 'Address');
-				foreach ($Line->children() as $Device)  {
-					$DeviceId=$this->xml_attribute($Device, 'Id');
-					$DeviceProductRefId=$this->xml_attribute($Device, 'ProductRefId');
-					if ($DeviceProductRefId != ''){
-						$this->Devices[$DeviceId]=array();
-                      				$this->Devices[$DeviceId]['DeviceName']=$this->getETSCatalogue($DeviceProductRefId);
-						$DeviceAddress=$this->xml_attribute($Device, 'Address');
-						$this->Devices[$DeviceId]['AdressePhysique']=$AreaAddress.'.'.$LineAddress.'.'.$DeviceAddress;
-						foreach($Device->children() as $ComObjectInstanceRefs){
-							if($ComObjectInstanceRefs->getName() == 'ComObjectInstanceRefs'){
-								foreach($ComObjectInstanceRefs->children() as $ComObjectInstanceRef){
-									$DataPointType=explode('-',$this->xml_attribute($ComObjectInstanceRef, 'DatapointType'));
-									if($this->xml_attribute($ComObjectInstanceRef, 'Links') !== false){
-										$this->Devices[$DeviceId]['Cmd'][$this->xml_attribute($ComObjectInstanceRef, 'Links')]['DataPointType']=$DataPointType[1].'.'.sprintf('%1$03d',$DataPointType[2]);
+		foreach($topology->children() as $area){
+			$areaAddress=$this->xml_attribute($area, 'Address');
+			foreach ($area->children() as $line)  {
+				$lineAddress=$this->xml_attribute($line, 'Address');
+				foreach ($line->children() as $device)  {
+					$deviceId=$this->xml_attribute($device, 'Id');
+					$deviceProductRefId=$this->xml_attribute($device, 'ProductRefId');
+					if ($deviceProductRefId != ''){
+						$this->devices[$deviceId]=array();
+                      				$this->devices[$deviceId]['DeviceName']=$this->getETSCatalog($deviceProductRefId);
+						$deviceAddress=$this->xml_attribute($device, 'Address');
+						$this->devices[$deviceId]['AdressePhysique']=$areaAddress.'.'.$lineAddress.'.'.$deviceAddress;
+						foreach($device->children() as $comObjectInstanceRefs){
+							if($comObjectInstanceRefs->getName() == 'ComObjectInstanceRefs'){
+								foreach($comObjectInstanceRefs->children() as $comObjectInstanceRef){
+									$dataPointType=explode('-',$this->xml_attribute($comObjectInstanceRef, 'DatapointType'));
+									if($this->xml_attribute($comObjectInstanceRef, 'Links') !== false){
+										$this->devices[$deviceId]['Cmd'][$this->xml_attribute($comObjectInstanceRef, 'Links')]['DataPointType']=$dataPointType[1].'.'.sprintf('%1$03d',$dataPointType[2]);
 									}else{
-										foreach($ComObjectInstanceRef->children() as $Connector){
-											foreach($Connector->children() as $Commande)
-												$this->Devices[$DeviceId]['Cmd'][$this->xml_attribute($Commande, 'GroupAddressRefId')]['DataPointType']=$DataPointType[1].'.'.sprintf('%1$03d',$DataPointType[2]);
+										foreach($comObjectInstanceRef->children() as $connector){
+											foreach($connector->children() as $commande)
+												$this->devices[$deviceId]['Cmd'][$this->xml_attribute($commande, 'GroupAddressRefId')]['DataPointType']=$dataPointType[1].'.'.sprintf('%1$03d',$dataPointType[2]);
 										}
 									}
 								}
@@ -364,4 +366,3 @@ class knxproj {
 		}
 	}
 }
-?>
