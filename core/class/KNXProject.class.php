@@ -1,5 +1,5 @@
 <?php
-class knxproj {
+class KNXProject {
 	private $path;
 	private $projectType;
 	private $devices=array();

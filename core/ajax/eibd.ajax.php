@@ -3,7 +3,7 @@ try {
 	require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
     	include_file('core', 'authentification', 'php');
 	include_file('core', 'dpt', 'class', 'eibd');
-	include_file('core', 'knxproj', 'class', 'eibd');
+	include_file('core', 'KNXProject', 'class', 'eibd');
 	include_file('core', 'autoCreate', 'class', 'eibd');
 
     	if (!isConnect('admin')) {
@@ -68,24 +68,24 @@ try {
 			ajax::success('');
 		break;
 		case 'EtsParser':
-			if(isset($_FILES['Knxproj'])){ 
+			if(isset($_FILES['KNXProject'])){
 				$uploaddir = '/tmp/KnxProj/';
 				if (!is_dir($uploaddir)) 
 					mkdir($uploaddir);
-				$uploadfile = $uploaddir.basename($_FILES['Knxproj']['name']);
-				$ext = pathinfo($_FILES['Knxproj']['name'], PATHINFO_EXTENSION);
-				if(move_uploaded_file($_FILES['Knxproj']['tmp_name'], $uploadfile)){
+				$uploadfile = $uploaddir.basename($_FILES['KNXProject']['name']);
+				$ext = pathinfo($_FILES['KNXProject']['name'], PATHINFO_EXTENSION);
+				if(move_uploaded_file($_FILES['KNXProject']['tmp_name'], $uploadfile)){
 					if($ext == 'gz')
-						knxproj::ExtractTX100ProjectFile($uploadfile);
+						KNXProject::ExtractTX100ProjectFile($uploadfile);
 					else
-						knxproj::ExtractETSProjectFile($uploadfile);
+						KNXProject::ExtractETSProjectFile($uploadfile);
 					ajax::success(true);
 				}else
 					ajax::success(false);
 			}
 		break;
 		case 'AnalyseEtsProj':
-			$knxproj=new knxproj(init('merge'),init('ProjetType'));
+			$knxproj=new KNXProject(init('merge'),init('ProjetType'));
 			$knxproj->WriteJsonProj();
 			ajax::success(json_decode($knxproj->getAll(),true));
 		break;
